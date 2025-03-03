@@ -2,17 +2,17 @@
 using UnityEngine;
 
 /// <summary>
-/// 近战攻击
+/// 射击远攻
 /// </summary>
-public class MeleeAttackAuthoring : MonoBehaviour
+public class ShootAttackAuthoring : MonoBehaviour
 {
     public float timerMax;
     public int damageAmount;
     public float colliderSize;
 
-    private class Baker : Baker<MeleeAttackAuthoring>
+    private class Baker : Baker<ShootAttackAuthoring>
     {
-        public override void Bake(MeleeAttackAuthoring authoring)
+        public override void Bake(ShootAttackAuthoring authoring)
         {
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
             AddComponent(entity, new MeleeAttack
@@ -25,7 +25,7 @@ public class MeleeAttackAuthoring : MonoBehaviour
     }
 }
 
-public struct MeleeAttack : IComponentData
+public struct ShootAttack : IComponentData
 {
     public float timer;
     public float timerMax;

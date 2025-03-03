@@ -1,4 +1,5 @@
 ﻿using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
@@ -29,6 +30,8 @@ namespace System
 
                 physicsVelocity.ValueRW.Linear = moveDirection * unitMover.ValueRO.moveSpeed;
                 physicsVelocity.ValueRW.Angular = float3.zero;
+                
+                
             }
         }
     }

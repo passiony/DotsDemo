@@ -1,8 +1,20 @@
 ﻿using System;
-using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
+
+public static class Facade
+{
+    public static NativeQueue<int> SharedQueue { get; } = new(Allocator.Persistent);
+
+    public static void Cleanup()
+    {
+        if (SharedQueue.IsCreated)
+        {
+            SharedQueue.Dispose();
+        }
+    }
+}
 
 public class GameManager : MonoBehaviour
 {
@@ -29,6 +41,8 @@ public class GameManager : MonoBehaviour
         {
             AddSpawnCommand(Faction.Blue);
         }
+
+        QueryDots();
     }
 
     void AddSpawnCommand(Faction faction)
@@ -43,5 +57,19 @@ public class GameManager : MonoBehaviour
             Faction = faction,
         };
         buffer.Add(command);
+    }
+
+    void QueryDots()
+    {
+        while (Facade.SharedQueue.TryDequeue(out int value))
+        {
+            // 主线程安全读取
+            Debug.Log(value);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        Facade.Cleanup();
     }
 }

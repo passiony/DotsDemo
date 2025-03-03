@@ -1,4 +1,5 @@
 ﻿using Unity.Burst;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
@@ -6,6 +7,14 @@ using UnityEngine;
 
 public partial struct HealthUISystem : ISystem
 {
+    private NativeQueue<int>.ParallelWriter _writer;
+
+    [BurstCompile]
+    public void OnCreate(ref SystemState state)
+    {
+        _writer = Facade.SharedQueue.AsParallelWriter();
+    }
+    
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
@@ -27,7 +36,7 @@ public partial struct HealthUISystem : ISystem
             Debug.Log(health.faction + ":" + health.healthAmount);
 #endif
             localTransform.ValueRW.Value = float4x4.Scale(healthNormalized, 1, 1);
-            
+            _writer.Enqueue(health.healthAmount);
         }
     }
 }
