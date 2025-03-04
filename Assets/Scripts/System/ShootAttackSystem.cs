@@ -54,7 +54,7 @@ partial struct ShootAttackSystem : ISystem
                             continue;
                         }
                         RefRW<Health> targetHealth = SystemAPI.GetComponentRW<Health>(raycastHit.Entity);
-                        if (targetHealth.ValueRW.faction == unit.ValueRW.Faction)
+                        if (targetHealth.ValueRW.faction == unit.ValueRW.faction)
                         {
                             continue;
                         }

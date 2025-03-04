@@ -4,8 +4,8 @@ using UnityEngine;
 
 public class UnitMoverAuthoring : MonoBehaviour
 {
-    public float moveSpeed;
-    public float rotationSpeed = 1;
+    public float moveSpeed = 2;
+    public float rotationSpeed = 2;
 
     private class Baker : Baker<UnitMoverAuthoring>
     {

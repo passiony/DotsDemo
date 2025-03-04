@@ -21,7 +21,7 @@ class UnitAuthoring : MonoBehaviour
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
             AddComponent(entity, new Unit
             {
-                Faction = authoring.faction,
+                faction = authoring.faction,
             });
         }
     }
@@ -29,5 +29,5 @@ class UnitAuthoring : MonoBehaviour
 
 public struct Unit : IComponentData
 {
-    public Faction Faction;
+    public Faction faction;
 }

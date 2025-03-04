@@ -1,34 +1,35 @@
 ﻿using Unity.Entities;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// 射击远攻
 /// </summary>
-public class ShootAttackAuthoring : MonoBehaviour
+public class MiningAuthoring : MonoBehaviour
 {
     public float timerMax = 2;
-    public int damageAmount = 2;
+    public int momeySpeed = 5;
     public float colliderSize = 2;
 
-    private class Baker : Baker<ShootAttackAuthoring>
+    private class Baker : Baker<MiningAuthoring>
     {
-        public override void Bake(ShootAttackAuthoring authoring)
+        public override void Bake(MiningAuthoring authoring)
         {
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
             AddComponent(entity, new MeleeAttack
             {
                 timerMax = authoring.timerMax,
-                damageAmount = authoring.damageAmount,
+                damageAmount = authoring.momeySpeed,
                 colliderSize = authoring.colliderSize,
             });
         }
     }
 }
 
-public struct ShootAttack : IComponentData
+public struct Mining : IComponentData
 {
     public float timer;
     public float timerMax;
-    public int damageAmount;
+    public int momeySpeed;
     public float colliderSize;
 }

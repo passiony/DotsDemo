@@ -5,7 +5,7 @@ using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 
-partial struct MeleeAttackSystem : ISystem
+partial struct MiningSystem : ISystem
 {
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
@@ -15,13 +15,13 @@ partial struct MeleeAttackSystem : ISystem
         NativeList<RaycastHit> raycastHitList = new NativeList<RaycastHit>(Allocator.Temp);
 
         foreach ((RefRO<LocalTransform> localTransform,
-                     RefRW<MeleeAttack> meleeAttack,
+                     RefRW<Mining> mining,
                      RefRW<UnitMover> unitMover,
                      RefRW<Unit> unit,
                      Entity entity)
                  in SystemAPI.Query<
                      RefRO<LocalTransform>,
-                     RefRW<MeleeAttack>,
+                     RefRW<Mining>,
                      RefRW<UnitMover>,
                      RefRW<Unit>>().WithEntityAccess())
         {
@@ -41,7 +41,7 @@ partial struct MeleeAttackSystem : ISystem
                 {
                     Start = localTransform.ValueRO.Position,
                     End = localTransform.ValueRO.Position +
-                          dirToTarget * (meleeAttack.ValueRO.colliderSize + distanceExtraToTestRaycast),
+                          dirToTarget * (mining.ValueRO.colliderSize + distanceExtraToTestRaycast),
                     Filter = CollisionFilter.Default,
                 };
                 raycastHitList.Clear();
@@ -49,17 +49,17 @@ partial struct MeleeAttackSystem : ISystem
                 {
                     foreach (RaycastHit raycastHit in raycastHitList)
                     {
-                        if (!SystemAPI.HasComponent<Health>(raycastHit.Entity))
+                        if (!SystemAPI.HasComponent<Gold>(raycastHit.Entity))
                         {
                             continue;
                         }
-                        RefRW<Health> targetHealth = SystemAPI.GetComponentRW<Health>(raycastHit.Entity);
+                        RefRW<Gold> targetHealth = SystemAPI.GetComponentRW<Gold>(raycastHit.Entity);
                         if (targetHealth.ValueRW.faction == unit.ValueRW.faction)
                         {
                             continue;
                         }
-                        targetHealth.ValueRW.healthAmount -= meleeAttack.ValueRO.damageAmount;
-                        targetHealth.ValueRW.onHealthChanged = true;
+                        targetHealth.ValueRW.goldAmount += mining.ValueRO.momeySpeed;
+                        targetHealth.ValueRW.onGoldChanged = true;
                         
                         entityCommandBuffer.DestroyEntity(entity);
                         break;

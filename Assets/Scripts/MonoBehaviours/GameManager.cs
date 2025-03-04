@@ -3,19 +3,6 @@ using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
-public static class Facade
-{
-    public static NativeQueue<int> SharedQueue { get; } = new(Allocator.Persistent);
-
-    public static void Cleanup()
-    {
-        if (SharedQueue.IsCreated)
-        {
-            SharedQueue.Dispose();
-        }
-    }
-}
-
 public class GameManager : MonoBehaviour
 {
     private EntityManager _entityManager;
@@ -34,18 +21,38 @@ public class GameManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Alpha1))
         {
-            AddSpawnCommand(Faction.Red);
+            AddSpawnCommand(Faction.Red, SolderType.Melee);
         }
 
         if (Input.GetKeyDown(KeyCode.Alpha2))
         {
-            AddSpawnCommand(Faction.Blue);
+            AddSpawnCommand(Faction.Red, SolderType.Shooting);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            AddSpawnCommand(Faction.Red, SolderType.Mining);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Alpha4))
+        {
+            AddSpawnCommand(Faction.Blue, SolderType.Melee);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Alpha5))
+        {
+            AddSpawnCommand(Faction.Blue, SolderType.Shooting);
+        }
+
+        if (Input.GetKeyDown(KeyCode.Alpha6))
+        {
+            AddSpawnCommand(Faction.Blue, SolderType.Mining);
         }
 
         QueryDots();
     }
 
-    void AddSpawnCommand(Faction faction)
+    void AddSpawnCommand(Faction faction, SolderType solder, int num = 1)
     {
         DynamicBuffer<GameCommand> buffer =
             _entityManager.GetBuffer<GameCommand>(_commandEntity);
@@ -53,18 +60,28 @@ public class GameManager : MonoBehaviour
         // 解析网络数据为命令（示例）
         var command = new GameCommand
         {
-            Type = GameCommand.CommandType.SpawnUnit,
+            CMD = CommandType.SpawnUnit,
             Faction = faction,
+            Solder = solder,
+            Number = num
         };
         buffer.Add(command);
     }
 
     void QueryDots()
     {
-        while (Facade.SharedQueue.TryDequeue(out int value))
+        while (Facade.SharedQueue.TryDequeue(out RcvData value))
         {
             // 主线程安全读取
-            Debug.Log(value);
+            switch (value.type)
+            {
+                case 1:
+                    UIManager.Instance.SetHP(value.faction, value.value);
+                    break;
+                case 2:
+                    UIManager.Instance.SetMoney(value.faction, (int)value.value);
+                    break;
+            }
         }
     }
 

@@ -22,6 +22,7 @@ public partial struct UnitSpawnerSystem : ISystem
             {
                 ProcessCommand(ref state, cmd);
             }
+
             buffer.Clear();
         }
     }
@@ -29,31 +30,99 @@ public partial struct UnitSpawnerSystem : ISystem
     [BurstCompile]
     private void ProcessCommand(ref SystemState state, GameCommand cmd)
     {
-        switch (cmd.Type)
+        switch (cmd.CMD)
         {
-            case GameCommand.CommandType.SpawnUnit:
-                EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
-                var prefabEntity = cmd.Faction == Faction.Red
-                    ? entitiesReferences.redSoldierPrefabEntity
-                    : entitiesReferences.blueSoldierPrefabEntity;
-                var startPosition = cmd.Faction == Faction.Red
-                    ? entitiesReferences.redStartPosition
-                    : entitiesReferences.blueStartPosition;
-                var targetPosition = cmd.Faction == Faction.Red
-                ? entitiesReferences.blueStartPosition
-                : entitiesReferences.redStartPosition;
-
+            case CommandType.SpawnUnit:
+                var prefabEntity = GetPrefab(cmd);
+                float3 startPosition = GetBornPos(cmd);
+                float3 targetPosition = GetTargetPos(cmd);
+                
                 Entity zombieEntity = state.EntityManager.Instantiate(prefabEntity);
                 SystemAPI.SetComponent(zombieEntity, LocalTransform.FromPosition(startPosition));
                 var mover = SystemAPI.GetComponentRW<UnitMover>(zombieEntity);
                 mover.ValueRW.targetPosition = targetPosition;
                 break;
-            case GameCommand.CommandType.DestroyUnit:
+            case CommandType.DestroyUnit:
                 break;
-            case GameCommand.CommandType.ChangeTeam:
+            case CommandType.ChangeTeam:
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    Entity GetPrefab(GameCommand cmd)
+    {
+        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
+        switch (cmd.Faction)
+        {
+            case Faction.Red:
+                switch (cmd.Solder)
+                {
+                    case SolderType.Melee:
+                        return entitiesReferences.redMeleePrefabEntity;
+                    case SolderType.Shooting:
+                        return entitiesReferences.redShootPrefabEntity;
+                    case SolderType.Mining:
+                        return entitiesReferences.redMiningPrefabEntity;
+                }
+                break;
+            case Faction.Blue:
+                switch (cmd.Solder)
+                {
+                    case SolderType.Melee:
+                        return entitiesReferences.blueMeleePrefabEntity;
+                    case SolderType.Shooting:
+                        return entitiesReferences.blueShootPrefabEntity;
+                    case SolderType.Mining:
+                        return entitiesReferences.blueMiningPrefabEntity;
+                }
+                break;
+        }
+        return Entity.Null;
+    }
+    float3 GetBornPos(GameCommand cmd)
+    {
+        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
+        switch (cmd.Faction)
+        {
+            case Faction.Red:
+                return entitiesReferences.redStartPosition;
+            case Faction.Blue:
+                return entitiesReferences.blueStartPosition;
+        }
+        return float3.zero;
+    }
+    float3 GetTargetPos(GameCommand cmd)
+    {
+        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
+        switch (cmd.Faction)
+        {
+            case Faction.Red:
+                switch (cmd.Solder)
+                {
+                    case SolderType.Melee:
+                    case SolderType.Shooting:
+                        return entitiesReferences.blueStartPosition;
+                    case SolderType.Mining:
+                        return entitiesReferences.redMinePosition;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+                break;
+            case Faction.Blue:
+                switch (cmd.Solder)
+                {
+                    case SolderType.Melee:
+                    case SolderType.Shooting:
+                        return entitiesReferences.redStartPosition;
+                    case SolderType.Mining:
+                        return entitiesReferences.blueStartPosition;
+                    default:
+                        throw new ArgumentOutOfRangeException();
+                }
+                break;
+        }
+        return float3.zero;
     }
 }
