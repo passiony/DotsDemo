@@ -1,34 +1,42 @@
 ﻿using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 
-/// <summary>
-/// 射击远攻
-/// </summary>
-public class ShootAttackAuthoring : MonoBehaviour
-{
-    public float timerMax = 2;
-    public int damageAmount = 2;
-    public float colliderSize = 2;
+public class ShootAttackAuthoring : MonoBehaviour {
+    public float timerMax;
+    public int damageAmount;
+    public float attackDistance;
+    public Transform bulletspawnPositionTransform;
 
-    private class Baker : Baker<ShootAttackAuthoring>
-    {
-        public override void Bake(ShootAttackAuthoring authoring)
-        {
+    public class Baker : Baker<ShootAttackAuthoring> {
+
+
+        public override void Bake(ShootAttackAuthoring authoring) {
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
-            AddComponent(entity, new MeleeAttack
-            {
+            AddComponent(entity, new ShootAttack {
                 timerMax = authoring.timerMax,
                 damageAmount = authoring.damageAmount,
-                colliderSize = authoring.colliderSize,
+                attackDistance = authoring.attackDistance,
+                bulletSpawnLocalPosition = authoring.bulletspawnPositionTransform.localPosition,
             });
         }
     }
 }
 
-public struct ShootAttack : IComponentData
-{
+
+
+public struct ShootAttack : IComponentData {
+
     public float timer;
     public float timerMax;
     public int damageAmount;
-    public float colliderSize;
+    public float attackDistance;
+    public float3 bulletSpawnLocalPosition;
+    public OnShootEvent onShoot;
+
+    public struct OnShootEvent {
+        public bool isTriggered;
+        public float3 shootFromPosition;
+    }
+
 }

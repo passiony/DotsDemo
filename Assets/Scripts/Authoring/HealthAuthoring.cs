@@ -4,6 +4,7 @@ using UnityEngine;
 public class HealthAuthoring : MonoBehaviour
 {
     public Faction faction;
+    public bool IsCity;
     public int healthAmount = 100;
     public int healthAmountMax = 100;
 
@@ -15,9 +16,10 @@ public class HealthAuthoring : MonoBehaviour
             AddComponent(entity, new Health
             {
                 faction = authoring.faction,
+                IsCity = authoring.IsCity,
                 healthAmount = authoring.healthAmount,
                 healthAmountMax = authoring.healthAmountMax,
-                onHealthChanged = true,
+                onHealthChanged = false,
             });
         }
     }
@@ -26,6 +28,7 @@ public class HealthAuthoring : MonoBehaviour
 public struct Health : IComponentData
 {
     public Faction faction;
+    public bool IsCity;
     public int healthAmount;
     public int healthAmountMax;
     public bool onHealthChanged;

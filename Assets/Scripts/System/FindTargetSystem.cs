@@ -1,6 +1,7 @@
 ﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
+using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
@@ -34,6 +35,10 @@ namespace System
                 CollisionFilter collisionFilter = CollisionFilter.Default;
                 
                 if (collisionWorld.OverlapSphere(localTransform.ValueRO.Position, findTarget.ValueRO.range, ref distanceHitList, collisionFilter)) {
+                    Entity closestTarget = Entity.Null;
+                    float closestDistanceSq = float.MaxValue;
+
+                    //寻找最近的目标
                     foreach (DistanceHit distanceHit in distanceHitList) {
                         if (!SystemAPI.Exists(distanceHit.Entity) || !SystemAPI.HasComponent<Unit>(distanceHit.Entity)) {
                             continue;
@@ -41,10 +46,19 @@ namespace System
                         Unit targetUnit = SystemAPI.GetComponent<Unit>(distanceHit.Entity);
                         if (targetUnit.faction == findTarget.ValueRO.targetFaction) {
                             // Valid target
-                            var targetTransform = SystemAPI.GetComponent<LocalTransform>(distanceHit.Entity);
-                            mover.ValueRW.targetPosition = targetTransform.Position;
-                            break;
+                            float distanceSq = math.distancesq(localTransform.ValueRO.Position, distanceHit.Position);
+                            if (distanceSq < closestDistanceSq) {
+                                closestTarget = distanceHit.Entity;
+                                closestDistanceSq = distanceSq;
+                            }
                         }
+                    }
+
+                    if (closestTarget != Entity.Null) {
+                        var targetTransform = SystemAPI.GetComponent<LocalTransform>(closestTarget);
+                        mover.ValueRW.targetPosition = targetTransform.Position;
+                        findTarget.ValueRW.targetEntity = closestTarget;
+                        Debug.Log("找到最近目标：" + SystemAPI.GetComponent<Unit>(closestTarget).Name);
                     }
                 }
             }

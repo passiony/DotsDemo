@@ -1,71 +1,52 @@
 ﻿using Unity.Burst;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
-using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
 
-partial struct ShootAttackSystem : ISystem
-{
+partial struct ShootAttackSystem : ISystem {
+
     [BurstCompile]
-    public void OnUpdate(ref SystemState state)
-    {
-        PhysicsWorldSingleton physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-        CollisionWorld collisionWorld = physicsWorldSingleton.CollisionWorld;
-        NativeList<RaycastHit> raycastHitList = new NativeList<RaycastHit>(Allocator.Temp);
+    public void OnUpdate(ref SystemState state) {
+        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
 
-        foreach ((RefRO<LocalTransform> localTransform,
-                     RefRW<MeleeAttack> meleeAttack,
-                     RefRW<UnitMover> unitMover,
-                     RefRW<Unit> unit,
-                     Entity entity)
-                 in SystemAPI.Query<
-                     RefRO<LocalTransform>,
-                     RefRW<MeleeAttack>,
-                     RefRW<UnitMover>,
-                     RefRW<Unit>>().WithEntityAccess())
-        {
-            float meleeAttackDistanceSq = 2f;
-            bool isCloseEnoughToAttack =
-                math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) <
-                meleeAttackDistanceSq;
-            EntityCommandBuffer entityCommandBuffer =
-                SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
+        foreach ((
+            RefRW<LocalTransform> localTransform,
+            RefRW <FindTarget> findTarget,
+            RefRW <ShootAttack> shootAttack,
+            RefRW<UnitMover> unitMover)
+            in SystemAPI.Query<
+                RefRW<LocalTransform>,
+                RefRW<FindTarget>,
+                RefRW<ShootAttack>,
+                RefRW<UnitMover>>()) {
 
-            if (!isCloseEnoughToAttack)
-            {
-                float3 dirToTarget = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;
-                dirToTarget = math.normalize(dirToTarget);
-                float distanceExtraToTestRaycast = 2f;
-                RaycastInput raycastInput = new RaycastInput
-                {
-                    Start = localTransform.ValueRO.Position,
-                    End = localTransform.ValueRO.Position +
-                          dirToTarget * (meleeAttack.ValueRO.colliderSize + distanceExtraToTestRaycast),
-                    Filter = CollisionFilter.Default,
-                };
-                raycastHitList.Clear();
-                if (collisionWorld.CastRay(raycastInput, ref raycastHitList))
-                {
-                    foreach (RaycastHit raycastHit in raycastHitList)
-                    {
-                        if (!SystemAPI.HasComponent<Health>(raycastHit.Entity))
-                        {
-                            continue;
-                        }
-                        RefRW<Health> targetHealth = SystemAPI.GetComponentRW<Health>(raycastHit.Entity);
-                        if (targetHealth.ValueRW.faction == unit.ValueRW.faction)
-                        {
-                            continue;
-                        }
-                        targetHealth.ValueRW.healthAmount -= meleeAttack.ValueRO.damageAmount;
-                        targetHealth.ValueRW.onHealthChanged = true;
-                        
-                        entityCommandBuffer.DestroyEntity(entity);
-                        break;
-                    }
-                }
+            float3 aimDirection = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;
+            aimDirection = math.normalize(aimDirection);
+
+            quaternion targetRotation = quaternion.LookRotation(aimDirection, math.up());
+            localTransform.ValueRW.Rotation =
+                math.slerp(localTransform.ValueRO.Rotation, targetRotation, SystemAPI.Time.DeltaTime * unitMover.ValueRO.rotationSpeed);
+
+            shootAttack.ValueRW.timer -= SystemAPI.Time.DeltaTime;
+            if (shootAttack.ValueRO.timer > 0f) {
+                continue;
             }
+            shootAttack.ValueRW.timer = shootAttack.ValueRO.timerMax;
+
+            Entity bulletEntity = state.EntityManager.Instantiate(entitiesReferences.bulletPrefabEntity);
+            float3 bulletSpawnWorldPosition = localTransform.ValueRO.TransformPoint(shootAttack.ValueRO.bulletSpawnLocalPosition);
+            SystemAPI.SetComponent(bulletEntity, LocalTransform.FromPosition(bulletSpawnWorldPosition));
+
+            RefRW<Bullet> bulletBullet = SystemAPI.GetComponentRW<Bullet>(bulletEntity);
+            bulletBullet.ValueRW.damageAmount = shootAttack.ValueRO.damageAmount;
+
+            RefRW<Target> bulletTarget = SystemAPI.GetComponentRW<Target>(bulletEntity);
+            bulletTarget.ValueRW.targetEntity = findTarget.ValueRO.targetEntity;
+
+            shootAttack.ValueRW.onShoot.isTriggered = true;
+            shootAttack.ValueRW.onShoot.shootFromPosition = bulletSpawnWorldPosition;
         }
     }
+
 }

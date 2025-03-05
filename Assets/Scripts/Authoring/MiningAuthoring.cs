@@ -16,10 +16,10 @@ public class MiningAuthoring : MonoBehaviour
         public override void Bake(MiningAuthoring authoring)
         {
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
-            AddComponent(entity, new MeleeAttack
+            AddComponent(entity, new Mining()
             {
                 timerMax = authoring.timerMax,
-                damageAmount = authoring.momeySpeed,
+                momeySpeed = authoring.momeySpeed,
                 colliderSize = authoring.colliderSize,
             });
         }

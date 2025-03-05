@@ -1,6 +1,7 @@
 ﻿using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class EntitiesReferencesAuthoring : MonoBehaviour
 {
@@ -10,6 +11,7 @@ public class EntitiesReferencesAuthoring : MonoBehaviour
     public GameObject blueShootPrefab;
     public GameObject redMiningPrefab;
     public GameObject blueMiningPrefab;
+    public GameObject bulletPrefabPrefab;
     
     public Transform redStartPoint;
     public Transform blueStartPoint;
@@ -29,6 +31,7 @@ public class EntitiesReferencesAuthoring : MonoBehaviour
                 blueShootPrefabEntity = GetEntity(authoring.blueShootPrefab, TransformUsageFlags.Dynamic),
                 redMiningPrefabEntity = GetEntity(authoring.redMiningPrefab, TransformUsageFlags.Dynamic),
                 blueMiningPrefabEntity = GetEntity(authoring.blueMiningPrefab, TransformUsageFlags.Dynamic),
+                bulletPrefabEntity = GetEntity(authoring.bulletPrefabPrefab, TransformUsageFlags.Dynamic),
                 redStartPosition = authoring.redStartPoint.position,
                 blueStartPosition = authoring.blueStartPoint.position,
                 redMinePosition = authoring.redMinePoint.position,
@@ -46,6 +49,7 @@ public struct EntitiesReferences : IComponentData
     public Entity blueShootPrefabEntity;
     public Entity redMiningPrefabEntity;
     public Entity blueMiningPrefabEntity;
+    public Entity bulletPrefabEntity;
     public float3 redStartPosition;
     public float3 blueStartPosition;
     public float3 redMinePosition;

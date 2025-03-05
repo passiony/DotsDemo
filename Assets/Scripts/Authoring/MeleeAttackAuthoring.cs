@@ -17,6 +17,7 @@ public class MeleeAttackAuthoring : MonoBehaviour
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
             AddComponent(entity, new MeleeAttack
             {
+                timer = authoring.timerMax,
                 timerMax = authoring.timerMax,
                 damageAmount = authoring.damageAmount,
                 colliderSize = authoring.colliderSize,

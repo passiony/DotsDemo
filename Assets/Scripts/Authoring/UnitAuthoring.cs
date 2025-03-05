@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Entities;
 using UnityEngine;
 
@@ -21,6 +22,7 @@ class UnitAuthoring : MonoBehaviour
             Entity entity = GetEntity(TransformUsageFlags.Dynamic);
             AddComponent(entity, new Unit
             {
+                Name=authoring.name,
                 faction = authoring.faction,
             });
         }
@@ -29,5 +31,6 @@ class UnitAuthoring : MonoBehaviour
 
 public struct Unit : IComponentData
 {
+    public FixedString32Bytes Name;
     public Faction faction;
 }

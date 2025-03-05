@@ -12,56 +12,42 @@ partial struct MiningSystem : ISystem
     {
         PhysicsWorldSingleton physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
         CollisionWorld collisionWorld = physicsWorldSingleton.CollisionWorld;
-        NativeList<RaycastHit> raycastHitList = new NativeList<RaycastHit>(Allocator.Temp);
+        NativeList<DistanceHit> distanceHitList = new NativeList<DistanceHit>(Allocator.Temp);
 
         foreach ((RefRO<LocalTransform> localTransform,
                      RefRW<Mining> mining,
-                     RefRW<UnitMover> unitMover,
-                     RefRW<Unit> unit,
-                     Entity entity)
+                     RefRW<UnitMover> unitMover)
                  in SystemAPI.Query<
                      RefRO<LocalTransform>,
                      RefRW<Mining>,
-                     RefRW<UnitMover>,
-                     RefRW<Unit>>().WithEntityAccess())
+                     RefRW<UnitMover>>())
         {
-            float meleeAttackDistanceSq = 2f;
-            bool isCloseEnoughToAttack =
-                math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) <
-                meleeAttackDistanceSq;
-            EntityCommandBuffer entityCommandBuffer =
-                SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
+            //攻击间隔
+            mining.ValueRW.timer -= SystemAPI.Time.DeltaTime;
+            if (mining.ValueRO.timer > 0) {
+                continue;
+            }
+            mining.ValueRW.timer = mining.ValueRO.timerMax;
 
-            if (!isCloseEnoughToAttack)
+            //开采矿石
+            bool isCloseEnoughToAttack = math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) < 10;
+            if (isCloseEnoughToAttack)
             {
-                float3 dirToTarget = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;
-                dirToTarget = math.normalize(dirToTarget);
-                float distanceExtraToTestRaycast = 2f;
-                RaycastInput raycastInput = new RaycastInput
+                distanceHitList.Clear();
+                CollisionFilter collisionFilter = CollisionFilter.Default;
+
+                if (collisionWorld.OverlapSphere(localTransform.ValueRO.Position, 2, ref distanceHitList,
+                        collisionFilter))
                 {
-                    Start = localTransform.ValueRO.Position,
-                    End = localTransform.ValueRO.Position +
-                          dirToTarget * (mining.ValueRO.colliderSize + distanceExtraToTestRaycast),
-                    Filter = CollisionFilter.Default,
-                };
-                raycastHitList.Clear();
-                if (collisionWorld.CastRay(raycastInput, ref raycastHitList))
-                {
-                    foreach (RaycastHit raycastHit in raycastHitList)
+                    foreach (var raycastHit in distanceHitList)
                     {
                         if (!SystemAPI.HasComponent<Gold>(raycastHit.Entity))
                         {
                             continue;
                         }
                         RefRW<Gold> targetHealth = SystemAPI.GetComponentRW<Gold>(raycastHit.Entity);
-                        if (targetHealth.ValueRW.faction == unit.ValueRW.faction)
-                        {
-                            continue;
-                        }
                         targetHealth.ValueRW.goldAmount += mining.ValueRO.momeySpeed;
                         targetHealth.ValueRW.onGoldChanged = true;
-                        
-                        entityCommandBuffer.DestroyEntity(entity);
                         break;
                     }
                 }

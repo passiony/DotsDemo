@@ -4,6 +4,8 @@ using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Physics;
 using Unity.Transforms;
+using UnityEngine;
+using RaycastHit = Unity.Physics.RaycastHit;
 
 partial struct MeleeAttackSystem : ISystem
 {
@@ -25,18 +27,25 @@ partial struct MeleeAttackSystem : ISystem
                      RefRW<UnitMover>,
                      RefRW<Unit>>().WithEntityAccess())
         {
-            float meleeAttackDistanceSq = 2f;
+            //攻击间隔
+            meleeAttack.ValueRW.timer -= SystemAPI.Time.DeltaTime;
+            if (meleeAttack.ValueRO.timer > 0) {
+                continue;
+            }
+            meleeAttack.ValueRW.timer = meleeAttack.ValueRO.timerMax;
+            
+            //攻击逻辑
+            Debug.Log("攻击一次");
+            float meleeAttackDistanceSq = 6f;
             bool isCloseEnoughToAttack =
                 math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) <
                 meleeAttackDistanceSq;
-            EntityCommandBuffer entityCommandBuffer =
-                SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>().CreateCommandBuffer(state.WorldUnmanaged);
 
-            if (!isCloseEnoughToAttack)
+            if (isCloseEnoughToAttack)
             {
                 float3 dirToTarget = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;
                 dirToTarget = math.normalize(dirToTarget);
-                float distanceExtraToTestRaycast = 2f;
+                float distanceExtraToTestRaycast = 4f;
                 RaycastInput raycastInput = new RaycastInput
                 {
                     Start = localTransform.ValueRO.Position,
@@ -59,9 +68,8 @@ partial struct MeleeAttackSystem : ISystem
                             continue;
                         }
                         targetHealth.ValueRW.healthAmount -= meleeAttack.ValueRO.damageAmount;
+                        Debug.Log("攻击到目标：" + targetHealth.ValueRW.healthAmount);
                         targetHealth.ValueRW.onHealthChanged = true;
-                        
-                        entityCommandBuffer.DestroyEntity(entity);
                         break;
                     }
                 }
