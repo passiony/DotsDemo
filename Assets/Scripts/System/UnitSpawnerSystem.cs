@@ -117,7 +117,7 @@ public partial struct UnitSpawnerSystem : ISystem
                     case SolderType.Shooting:
                         return entitiesReferences.redStartPosition;
                     case SolderType.Mining:
-                        return entitiesReferences.blueStartPosition;
+                        return entitiesReferences.blueMinePosition;
                     default:
                         throw new ArgumentOutOfRangeException();
                 }

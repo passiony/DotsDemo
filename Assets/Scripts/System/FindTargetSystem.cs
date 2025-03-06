@@ -10,6 +10,11 @@ namespace System
 {
     public partial struct FindTargetSystem : ISystem
     {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<PhysicsWorldSingleton>();
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {

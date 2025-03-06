@@ -4,8 +4,8 @@ using UnityEngine;
 public class GoldAuthoring : MonoBehaviour
 {
     public Faction faction;
-    public int goldAmount = 100;
-    
+    public int goldAmount = 5;
+
     private class Baker : Baker<GoldAuthoring>
     {
         public override void Bake(GoldAuthoring authoring)

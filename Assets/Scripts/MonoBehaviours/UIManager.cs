@@ -15,6 +15,8 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI redMoney;
     public TextMeshProUGUI blueMoney;
 
+    public GameObject GameOver;
+
     void Awake()
     {
         Instance = this;
@@ -27,10 +29,22 @@ public class UIManager : MonoBehaviour
             case Faction.Red:
                 redProgress.fillAmount = value;
                 redHP.text = ((int)(value * 100)).ToString();
+                if (value <= 0)
+                {
+                    GameOver.SetActive(true);
+                    GameManager.Instance.GameOver = true;
+                }
+
                 break;
             case Faction.Blue:
                 blueProgress.fillAmount = value;
                 blueHP.text = ((int)(value * 100)).ToString();
+                if (value <= 0)
+                {
+                    GameOver.SetActive(true);
+                    GameManager.Instance.GameOver = true;
+                }
+
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(faction), faction, null);
@@ -51,4 +65,5 @@ public class UIManager : MonoBehaviour
                 throw new ArgumentOutOfRangeException(nameof(faction), faction, null);
         }
     }
+    
 }

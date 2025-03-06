@@ -4,6 +4,10 @@ using Unity.Mathematics;
 using Unity.Transforms;
 
 partial struct BulletMoverSystem : ISystem {
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
+    }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state) {

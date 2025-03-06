@@ -9,6 +9,11 @@ using RaycastHit = Unity.Physics.RaycastHit;
 
 partial struct MeleeAttackSystem : ISystem
 {
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<PhysicsWorldSingleton>();
+    }
+
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
@@ -36,11 +41,11 @@ partial struct MeleeAttackSystem : ISystem
             
             //攻击逻辑
             Debug.Log("攻击一次");
-            float meleeAttackDistanceSq = 6f;
+            float meleeAttackDistanceSq = 10f;
             bool isCloseEnoughToAttack =
                 math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) <
                 meleeAttackDistanceSq;
-
+            
             if (isCloseEnoughToAttack)
             {
                 float3 dirToTarget = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;

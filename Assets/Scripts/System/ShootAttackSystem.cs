@@ -5,6 +5,10 @@ using Unity.Transforms;
 using UnityEngine;
 
 partial struct ShootAttackSystem : ISystem {
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<EntitiesReferences>();
+    }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state) {
@@ -33,7 +37,7 @@ partial struct ShootAttackSystem : ISystem {
                 continue;
             }
             shootAttack.ValueRW.timer = shootAttack.ValueRO.timerMax;
-
+            
             Entity bulletEntity = state.EntityManager.Instantiate(entitiesReferences.bulletPrefabEntity);
             float3 bulletSpawnWorldPosition = localTransform.ValueRO.TransformPoint(shootAttack.ValueRO.bulletSpawnLocalPosition);
             SystemAPI.SetComponent(bulletEntity, LocalTransform.FromPosition(bulletSpawnWorldPosition));

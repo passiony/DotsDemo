@@ -7,6 +7,11 @@ using Unity.Transforms;
 
 partial struct MiningSystem : ISystem
 {
+    public void OnCreate(ref SystemState state)
+    {
+        state.RequireForUpdate<PhysicsWorldSingleton>();
+    }
+
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
@@ -30,7 +35,8 @@ partial struct MiningSystem : ISystem
             mining.ValueRW.timer = mining.ValueRO.timerMax;
 
             //开采矿石
-            bool isCloseEnoughToAttack = math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) < 10;
+            int distance = 2;
+            bool isCloseEnoughToAttack = math.distancesq(localTransform.ValueRO.Position, unitMover.ValueRO.targetPosition) < distance;
             if (isCloseEnoughToAttack)
             {
                 distanceHitList.Clear();
@@ -46,7 +52,7 @@ partial struct MiningSystem : ISystem
                             continue;
                         }
                         RefRW<Gold> targetHealth = SystemAPI.GetComponentRW<Gold>(raycastHit.Entity);
-                        targetHealth.ValueRW.goldAmount += mining.ValueRO.momeySpeed;
+                        targetHealth.ValueRW.goldAmount = mining.ValueRO.momeySpeed;
                         targetHealth.ValueRW.onGoldChanged = true;
                         break;
                     }
