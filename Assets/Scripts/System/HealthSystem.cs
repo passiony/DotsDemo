@@ -1,4 +1,4 @@
-﻿using Unity.Burst;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -8,6 +8,7 @@ using UnityEngine;
 public partial struct HealthSystem : ISystem
 {
     private NativeQueue<RcvData>.ParallelWriter _writer;
+    private EntityCommandBuffer.ParallelWriter _ecb;
 
     [BurstCompile]
     public void OnCreate(ref SystemState state)
@@ -19,38 +20,40 @@ public partial struct HealthSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        // foreach ((RefRW<PostTransformMatrix> localTransform,
-        //              RefRW<Health> health)
-        //          in SystemAPI.Query<
-        //              RefRW<PostTransformMatrix>,
-        //              RefRW<Health>>())
-        foreach ((RefRW<Health> health, Entity entity)
-                 in SystemAPI.Query<RefRW<Health>>().WithEntityAccess())
+        _ecb = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>()
+            .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+        var job = new HealthJob
         {
-            if (health.ValueRW.onHealthChanged)
-            {
-                health.ValueRW.onHealthChanged = false;
-                float healthNormalized = health.ValueRW.healthAmount / (float)health.ValueRW.healthAmountMax;
-                //Debug.Log(health.faction + ":" + health.healthAmount);
-                //localTransform.ValueRW.Value = float4x4.Scale(healthNormalized, 1, 1);
+            Writer = _writer,
+            ECB = _ecb,
+        };
+        var jobHandle = job.ScheduleParallel(state.Dependency);
+        jobHandle.Complete(); // 确保Job执行完成
+    }
+}
 
-                Debug.Log("Health:" + health.ValueRW.healthAmount);
-                
-                //主城 发送数据到UI层
-                if (health.ValueRO.IsCity)
-                {
-                    _writer.Enqueue(new RcvData(health.ValueRW.faction, 1, healthNormalized));
-                }
+[BurstCompile]
+public partial struct HealthJob : IJobEntity
+{
+    public NativeQueue<RcvData>.ParallelWriter Writer;
+    public EntityCommandBuffer.ParallelWriter ECB;
 
-                //死亡判定
-                if (health.ValueRW.healthAmount <= 0)
-                {
-                    EntityCommandBuffer entityCommandBuffer =
-                        SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>()
-                            .CreateCommandBuffer(state.WorldUnmanaged);
-                    entityCommandBuffer.DestroyEntity(entity);
-                }
-            }
+    public void Execute([EntityIndexInQuery] int index,
+        ref Health health,
+        Entity entity)
+    {
+        float healthNormalized = health.healthAmount / (float)health.healthAmountMax;
+        //主城 发送数据到UI层
+        if (health.IsCity)
+        {
+            Writer.Enqueue(new RcvData(health.faction, 1, healthNormalized));
+        }
+
+        //死亡判定
+        if (health.healthAmount <= 0)
+        {
+            // Debug.Log("角色死亡");
+            ECB.DestroyEntity(index, entity);
         }
     }
 }

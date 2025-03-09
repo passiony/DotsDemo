@@ -1,56 +1,76 @@
-﻿using Unity.Burst;
+using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
 using UnityEngine;
 
-partial struct ShootAttackSystem : ISystem {
+partial struct ShootAttackSystem : ISystem
+{
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
         state.RequireForUpdate<EntitiesReferences>();
     }
 
     [BurstCompile]
-    public void OnUpdate(ref SystemState state) {
-        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
+    public void OnUpdate(ref SystemState state)
+    {
+        var job = new ShootAttackJob
+        {
+            EntitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>(),
+            DeltaTime = SystemAPI.Time.DeltaTime,
+            ECB = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>()
+                .CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter()
+        };
 
-        foreach ((
-            RefRW<LocalTransform> localTransform,
-            RefRW <FindTarget> findTarget,
-            RefRW <ShootAttack> shootAttack,
-            RefRW<UnitMover> unitMover)
-            in SystemAPI.Query<
-                RefRW<LocalTransform>,
-                RefRW<FindTarget>,
-                RefRW<ShootAttack>,
-                RefRW<UnitMover>>()) {
-
-            float3 aimDirection = unitMover.ValueRO.targetPosition - localTransform.ValueRO.Position;
-            aimDirection = math.normalize(aimDirection);
-
-            quaternion targetRotation = quaternion.LookRotation(aimDirection, math.up());
-            localTransform.ValueRW.Rotation =
-                math.slerp(localTransform.ValueRO.Rotation, targetRotation, SystemAPI.Time.DeltaTime * unitMover.ValueRO.rotationSpeed);
-
-            shootAttack.ValueRW.timer -= SystemAPI.Time.DeltaTime;
-            if (shootAttack.ValueRO.timer > 0f) {
-                continue;
-            }
-            shootAttack.ValueRW.timer = shootAttack.ValueRO.timerMax;
-            
-            Entity bulletEntity = state.EntityManager.Instantiate(entitiesReferences.bulletPrefabEntity);
-            float3 bulletSpawnWorldPosition = localTransform.ValueRO.TransformPoint(shootAttack.ValueRO.bulletSpawnLocalPosition);
-            SystemAPI.SetComponent(bulletEntity, LocalTransform.FromPosition(bulletSpawnWorldPosition));
-
-            RefRW<Bullet> bulletBullet = SystemAPI.GetComponentRW<Bullet>(bulletEntity);
-            bulletBullet.ValueRW.damageAmount = shootAttack.ValueRO.damageAmount;
-
-            RefRW<Target> bulletTarget = SystemAPI.GetComponentRW<Target>(bulletEntity);
-            bulletTarget.ValueRW.targetEntity = findTarget.ValueRO.targetEntity;
-
-            shootAttack.ValueRW.onShoot.isTriggered = true;
-            shootAttack.ValueRW.onShoot.shootFromPosition = bulletSpawnWorldPosition;
-        }
+        var jobHandle = job.ScheduleParallel(state.Dependency);
+        jobHandle.Complete();
     }
+}
 
+[BurstCompile]
+public partial struct ShootAttackJob : IJobEntity
+{
+    public EntitiesReferences EntitiesReferences;
+    public float DeltaTime;
+    public EntityCommandBuffer.ParallelWriter ECB;
+
+    public void Execute([EntityIndexInQuery] int index,
+        ref LocalTransform localTransform,
+        ref FindTarget findTarget,
+        ref ShootAttack shootAttack,
+        ref UnitMover unitMover)
+    {
+        float3 aimDirection = unitMover.targetPosition - localTransform.Position;
+        aimDirection = math.normalize(aimDirection);
+
+        quaternion targetRotation = quaternion.LookRotation(aimDirection, math.up());
+        localTransform.Rotation =
+            math.slerp(localTransform.Rotation, targetRotation, DeltaTime * unitMover.rotationSpeed);
+
+        shootAttack.timer -= DeltaTime;
+        if (shootAttack.timer > 0f)
+        {
+            return;
+        }
+
+        shootAttack.timer = shootAttack.timerMax;
+
+        Entity bulletEntity = ECB.Instantiate(index, EntitiesReferences.bulletPrefabEntity);
+        float3 bulletSpawnWorldPosition = localTransform.TransformPoint(shootAttack.bulletSpawnLocalPosition);
+        ECB.SetComponent(index, bulletEntity, LocalTransform.FromPosition(bulletSpawnWorldPosition));
+
+        ECB.SetComponent(index, bulletEntity, new Bullet
+        {
+            speed = 5,
+            damageAmount = shootAttack.damageAmount
+        });
+
+        ECB.SetComponent(index, bulletEntity, new Target
+        {
+            targetEntity = findTarget.targetEntity
+        });
+        shootAttack.onShoot.isTriggered = true;
+        shootAttack.onShoot.shootFromPosition = bulletSpawnWorldPosition;
+    }
 }

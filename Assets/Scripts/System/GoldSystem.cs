@@ -1,4 +1,4 @@
-﻿using Unity.Burst;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -18,20 +18,29 @@ public partial struct GoldSystem : ISystem
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        // foreach ((RefRW<PostTransformMatrix> localTransform,
-        //              RefRW<Gold> health)
-        //          in SystemAPI.Query<
-        //              RefRW<PostTransformMatrix>,
-        //              RefRW<Gold>>())
-        foreach (RefRW<Gold> health in SystemAPI.Query<RefRW<Gold>>())
+        var job = new GoldJob
         {
-            if (health.ValueRW.onGoldChanged)
-            {
-                health.ValueRW.onGoldChanged = false;
-                
-                //发送数据到UI层
-                _writer.Enqueue(new RcvData(health.ValueRW.faction, 2, health.ValueRW.goldAmount));
-            }
+            Writer = _writer
+        };
+
+        var jobHandle = job.ScheduleParallel(state.Dependency);
+        jobHandle.Complete();
+    }
+}
+
+[BurstCompile]
+public partial struct GoldJob : IJobEntity
+{
+    public NativeQueue<RcvData>.ParallelWriter Writer;
+
+    public void Execute(ref Gold gold)
+    {
+        if (gold.onGoldChanged)
+        {
+            gold.onGoldChanged = false;
+            
+            // 发送数据到UI层
+            Writer.Enqueue(new RcvData(gold.faction, 2, gold.goldAmount));
         }
     }
 }

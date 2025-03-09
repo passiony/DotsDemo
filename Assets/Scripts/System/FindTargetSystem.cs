@@ -1,4 +1,4 @@
-﻿using Unity.Burst;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -6,67 +6,95 @@ using Unity.Physics;
 using Unity.Transforms;
 using UnityEngine;
 
-namespace System
+public partial struct FindTargetSystem : ISystem
 {
-    public partial struct FindTargetSystem : ISystem
+    private ComponentLookup<Unit> unitLookup;
+    private ComponentLookup<LocalTransform> LocalTransformLookup;
+
+    public void OnCreate(ref SystemState state)
     {
-        public void OnCreate(ref SystemState state)
+        state.RequireForUpdate<PhysicsWorldSingleton>();
+        unitLookup = state.GetComponentLookup<Unit>();
+        LocalTransformLookup = state.GetComponentLookup<LocalTransform>(true);
+    }
+
+    [BurstCompile]
+    public void OnUpdate(ref SystemState state)
+    {
+        PhysicsWorldSingleton physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
+        unitLookup.Update(ref state);
+        LocalTransformLookup.Update(ref state);
+
+        var job = new FindTargetJob
         {
-            state.RequireForUpdate<PhysicsWorldSingleton>();
+            PhysicsWorldSingleton = physicsWorldSingleton,
+            DeltaTime = SystemAPI.Time.DeltaTime,
+            UnitLookup = unitLookup,
+            LocalTransformLookup = LocalTransformLookup,
+        };
+
+        var jobHandle = job.ScheduleParallel(state.Dependency);
+        jobHandle.Complete();
+    }
+}
+
+[BurstCompile]
+public partial struct FindTargetJob : IJobEntity
+{
+    [ReadOnly] public PhysicsWorldSingleton PhysicsWorldSingleton;
+    public float DeltaTime;
+    [NativeDisableParallelForRestriction] public ComponentLookup<Unit> UnitLookup;
+    [ReadOnly] public ComponentLookup<LocalTransform> LocalTransformLookup; 
+
+    public void Execute(ref FindTarget findTarget, ref UnitMover mover, in LocalTransform localTransform)
+    {
+        findTarget.timer -= DeltaTime;
+        if (findTarget.timer > 0f)
+        {
+            // Timer not elapsed
+            return;
         }
 
-        [BurstCompile]
-        public void OnUpdate(ref SystemState state)
+        findTarget.timer = findTarget.timerMax;
+
+        NativeList<DistanceHit> distanceHitList = new NativeList<DistanceHit>(Allocator.Temp);
+        CollisionFilter collisionFilter = CollisionFilter.Default;
+
+        if (PhysicsWorldSingleton.CollisionWorld.OverlapSphere(localTransform.Position, findTarget.range,
+                ref distanceHitList, collisionFilter))
         {
-            PhysicsWorldSingleton physicsWorldSingleton = SystemAPI.GetSingleton<PhysicsWorldSingleton>();
-            CollisionWorld collisionWorld = physicsWorldSingleton.CollisionWorld;
-            NativeList<DistanceHit> distanceHitList = new NativeList<DistanceHit>(Allocator.Temp);
+            Entity closestTarget = Entity.Null;
+            float closestDistanceSq = float.MaxValue;
 
-            foreach ((RefRO<LocalTransform> localTransform,
-                         RefRW<FindTarget> findTarget,
-                         RefRW<UnitMover> mover)
-                     in SystemAPI.Query<
-                         RefRO<LocalTransform>,
-                         RefRW<FindTarget>,RefRW<UnitMover>>()) {
-
-                findTarget.ValueRW.timer -= SystemAPI.Time.DeltaTime;
-                if (findTarget.ValueRO.timer > 0f) {
-                    // Timer not elapsed
+            //寻找最近的目标
+            foreach (DistanceHit distanceHit in distanceHitList)
+            {
+                if (!UnitLookup.HasComponent(distanceHit.Entity)) // 使用ComponentLookup检查实体是否存在
+                {
                     continue;
                 }
-                findTarget.ValueRW.timer = findTarget.ValueRO.timerMax;
-                
-                distanceHitList.Clear();
-                CollisionFilter collisionFilter = CollisionFilter.Default;
-                
-                if (collisionWorld.OverlapSphere(localTransform.ValueRO.Position, findTarget.ValueRO.range, ref distanceHitList, collisionFilter)) {
-                    Entity closestTarget = Entity.Null;
-                    float closestDistanceSq = float.MaxValue;
 
-                    //寻找最近的目标
-                    foreach (DistanceHit distanceHit in distanceHitList) {
-                        if (!SystemAPI.Exists(distanceHit.Entity) || !SystemAPI.HasComponent<Unit>(distanceHit.Entity)) {
-                            continue;
-                        }
-                        Unit targetUnit = SystemAPI.GetComponent<Unit>(distanceHit.Entity);
-                        if (targetUnit.faction == findTarget.ValueRO.targetFaction) {
-                            // Valid target
-                            float distanceSq = math.distancesq(localTransform.ValueRO.Position, distanceHit.Position);
-                            if (distanceSq < closestDistanceSq) {
-                                closestTarget = distanceHit.Entity;
-                                closestDistanceSq = distanceSq;
-                            }
-                        }
-                    }
-
-                    if (closestTarget != Entity.Null) {
-                        var targetTransform = SystemAPI.GetComponent<LocalTransform>(closestTarget);
-                        mover.ValueRW.targetPosition = targetTransform.Position;
-                        findTarget.ValueRW.targetEntity = closestTarget;
-                        Debug.Log("找到最近目标：" + SystemAPI.GetComponent<Unit>(closestTarget).Name);
+                Unit targetUnit = UnitLookup[distanceHit.Entity];
+                if (targetUnit.faction == findTarget.targetFaction)
+                {
+                    // Valid target
+                    float distanceSq = math.distancesq(localTransform.Position, distanceHit.Position);
+                    if (distanceSq < closestDistanceSq)
+                    {
+                        closestTarget = distanceHit.Entity;
+                        closestDistanceSq = distanceSq;
                     }
                 }
             }
+
+            if (closestTarget != Entity.Null)
+            {
+                var targetTransform = LocalTransformLookup[closestTarget]; // 使用ComponentLookup获取LocalTransform组件
+                mover.targetPosition = targetTransform.Position;
+                findTarget.targetEntity = closestTarget;
+            }
         }
+
+        distanceHitList.Dispose();
     }
 }

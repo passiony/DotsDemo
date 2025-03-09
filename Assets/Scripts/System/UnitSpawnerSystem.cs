@@ -1,34 +1,52 @@
-﻿using System;
+using System;
 using Unity.Burst;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.Transforms;
-using UnityEngine;
 
 public partial struct UnitSpawnerSystem : ISystem
 {
     [BurstCompile]
     public void OnCreate(ref SystemState state)
     {
+        state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
         state.RequireForUpdate<EntitiesReferences>();
     }
 
     [BurstCompile]
     public void OnUpdate(ref SystemState state)
     {
-        foreach (var buffer in SystemAPI.Query<DynamicBuffer<GameCommand>>())
+        var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+        var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+        var entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
+        var job = new UnitSpawnerJob
         {
-            foreach (GameCommand cmd in buffer)
-            {
-                ProcessCommand(ref state, cmd);
-            }
+            EntitiesReferences = entitiesReferences,
+            ECB = ecb
+        };
 
-            buffer.Clear();
+        var jobHandle = job.ScheduleParallel(state.Dependency);
+        jobHandle.Complete();
+    }
+}
+
+[BurstCompile]
+public partial struct UnitSpawnerJob : IJobEntity
+{
+    public EntityCommandBuffer.ParallelWriter ECB;
+    public EntitiesReferences EntitiesReferences;
+
+    public void Execute([EntityIndexInQuery] int index, ref DynamicBuffer<GameCommand> buffer)
+    {
+        foreach (GameCommand cmd in buffer)
+        {
+            ProcessCommand(index, cmd);
         }
+
+        buffer.Clear();
     }
 
-    [BurstCompile]
-    private void ProcessCommand(ref SystemState state, GameCommand cmd)
+    private void ProcessCommand(int index, GameCommand cmd)
     {
         switch (cmd.CMD)
         {
@@ -36,11 +54,15 @@ public partial struct UnitSpawnerSystem : ISystem
                 var prefabEntity = GetPrefab(cmd);
                 float3 startPosition = GetBornPos(cmd);
                 float3 targetPosition = GetTargetPos(cmd);
-                
-                Entity zombieEntity = state.EntityManager.Instantiate(prefabEntity);
-                SystemAPI.SetComponent(zombieEntity, LocalTransform.FromPosition(startPosition));
-                var mover = SystemAPI.GetComponentRW<UnitMover>(zombieEntity);
-                mover.ValueRW.targetPosition = targetPosition;
+
+                Entity zombieEntity = ECB.Instantiate(index, prefabEntity);
+                ECB.SetComponent(index, zombieEntity, LocalTransform.FromPosition(startPosition));
+                ECB.SetComponent(index, zombieEntity, new UnitMover
+                {
+                    moveSpeed = 2,
+                    rotationSpeed = 2,
+                    targetPosition = targetPosition
+                });
                 break;
             case CommandType.DestroyUnit:
                 break;
@@ -53,49 +75,52 @@ public partial struct UnitSpawnerSystem : ISystem
 
     Entity GetPrefab(GameCommand cmd)
     {
-        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
         switch (cmd.Faction)
         {
             case Faction.Red:
                 switch (cmd.Solder)
                 {
                     case SolderType.Melee:
-                        return entitiesReferences.redMeleePrefabEntity;
+                        return EntitiesReferences.redMeleePrefabEntity;
                     case SolderType.Shooting:
-                        return entitiesReferences.redShootPrefabEntity;
+                        return EntitiesReferences.redShootPrefabEntity;
                     case SolderType.Mining:
-                        return entitiesReferences.redMiningPrefabEntity;
+                        return EntitiesReferences.redMiningPrefabEntity;
                 }
+
                 break;
             case Faction.Blue:
                 switch (cmd.Solder)
                 {
                     case SolderType.Melee:
-                        return entitiesReferences.blueMeleePrefabEntity;
+                        return EntitiesReferences.blueMeleePrefabEntity;
                     case SolderType.Shooting:
-                        return entitiesReferences.blueShootPrefabEntity;
+                        return EntitiesReferences.blueShootPrefabEntity;
                     case SolderType.Mining:
-                        return entitiesReferences.blueMiningPrefabEntity;
+                        return EntitiesReferences.blueMiningPrefabEntity;
                 }
+
                 break;
         }
+
         return Entity.Null;
     }
+
     float3 GetBornPos(GameCommand cmd)
     {
-        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
         switch (cmd.Faction)
         {
             case Faction.Red:
-                return entitiesReferences.redStartPosition;
+                return EntitiesReferences.redStartPosition;
             case Faction.Blue:
-                return entitiesReferences.blueStartPosition;
+                return EntitiesReferences.blueStartPosition;
         }
+
         return float3.zero;
     }
+
     float3 GetTargetPos(GameCommand cmd)
     {
-        EntitiesReferences entitiesReferences = SystemAPI.GetSingleton<EntitiesReferences>();
         switch (cmd.Faction)
         {
             case Faction.Red:
@@ -103,26 +128,29 @@ public partial struct UnitSpawnerSystem : ISystem
                 {
                     case SolderType.Melee:
                     case SolderType.Shooting:
-                        return entitiesReferences.blueStartPosition;
+                        return EntitiesReferences.blueStartPosition;
                     case SolderType.Mining:
-                        return entitiesReferences.redMinePosition;
+                        return EntitiesReferences.redMinePosition;
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
+
                 break;
             case Faction.Blue:
                 switch (cmd.Solder)
                 {
                     case SolderType.Melee:
                     case SolderType.Shooting:
-                        return entitiesReferences.redStartPosition;
+                        return EntitiesReferences.redStartPosition;
                     case SolderType.Mining:
-                        return entitiesReferences.blueMinePosition;
+                        return EntitiesReferences.blueMinePosition;
                     default:
                         throw new ArgumentOutOfRangeException();
                 }
+
                 break;
         }
+
         return float3.zero;
     }
 }
